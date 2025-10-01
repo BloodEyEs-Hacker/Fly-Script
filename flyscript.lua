@@ -1,25 +1,27 @@
--- Fly Script with GUI - Mobile Version
+-- Multi-Function Menu for Roblox
 local Player = game:GetService("Players").LocalPlayer
 local Character = Player.Character or Player.CharacterAdded:Wait()
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 local Humanoid = Character:WaitForChild("Humanoid")
 
--- Fly variables
+-- Variables for functions
 local flying = false
 local flySpeed = 50
 local bodyVelocity
-local flightConnection
+local speedHackEnabled = false
+local highJumpEnabled = false
+local espEnabled = false
 
--- Create ScreenGui
+-- Create Main ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FlyGUI"
+ScreenGui.Name = "MultiMenuGUI"
 ScreenGui.Parent = Player.PlayerGui
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Main Frame
+-- Main Menu Frame
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 300, 0, 250)
+MainFrame.Size = UDim2.new(0, 300, 0, 350)
 MainFrame.Position = UDim2.new(0, 10, 0, 10)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
 MainFrame.BorderColor3 = Color3.fromRGB(0, 100, 255)
@@ -38,7 +40,7 @@ Title.Size = UDim2.new(1, 0, 0, 40)
 Title.Position = UDim2.new(0, 0, 0, 0)
 Title.BackgroundColor3 = Color3.fromRGB(0, 80, 200)
 Title.BackgroundTransparency = 0.5
-Title.Text = "FLIGHT CONTROL - MOBILE"
+Title.Text = "MULTI-FUNCTION MENU"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 18
 Title.Font = Enum.Font.GothamBold
@@ -49,57 +51,83 @@ local TitleCorner = Instance.new("UICorner")
 TitleCorner.CornerRadius = UDim.new(0, 8)
 TitleCorner.Parent = Title
 
--- Status Label
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Name = "StatusLabel"
-StatusLabel.Size = UDim2.new(1, -20, 0, 25)
-StatusLabel.Position = UDim2.new(0, 10, 0, 50)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Text = "Status: DISABLED"
-StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-StatusLabel.TextSize = 14
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-StatusLabel.Parent = MainFrame
+-- Function Buttons Container
+local ButtonsContainer = Instance.new("Frame")
+ButtonsContainer.Name = "ButtonsContainer"
+ButtonsContainer.Size = UDim2.new(0.9, 0, 0, 250)
+ButtonsContainer.Position = UDim2.new(0.05, 0, 0, 50)
+ButtonsContainer.BackgroundTransparency = 1
+ButtonsContainer.Parent = MainFrame
 
--- Speed Label
-local SpeedLabel = Instance.new("TextLabel")
-SpeedLabel.Name = "SpeedLabel"
-SpeedLabel.Size = UDim2.new(1, -20, 0, 25)
-SpeedLabel.Position = UDim2.new(0, 10, 0, 75)
-SpeedLabel.BackgroundTransparency = 1
-SpeedLabel.Text = "Speed: 50"
-SpeedLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
-SpeedLabel.TextSize = 14
-SpeedLabel.Font = Enum.Font.Gotham
-SpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
-SpeedLabel.Parent = MainFrame
+-- Function 1: SpeedHack
+local SpeedHackButton = Instance.new("TextButton")
+SpeedHackButton.Name = "SpeedHackButton"
+SpeedHackButton.Size = UDim2.new(1, 0, 0, 40)
+SpeedHackButton.Position = UDim2.new(0, 0, 0, 0)
+SpeedHackButton.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+SpeedHackButton.Text = "SPEED HACK: OFF"
+SpeedHackButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+SpeedHackButton.TextSize = 14
+SpeedHackButton.Font = Enum.Font.GothamBold
+SpeedHackButton.Parent = ButtonsContainer
 
--- Toggle Button
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Name = "ToggleButton"
-ToggleButton.Size = UDim2.new(0.9, 0, 0, 35)
-ToggleButton.Position = UDim2.new(0.05, 0, 0, 110)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-ToggleButton.Text = "ENABLE FLIGHT"
-ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.TextSize = 14
-ToggleButton.Font = Enum.Font.GothamBold
-ToggleButton.Parent = MainFrame
+-- Function 2: KillAll
+local KillAllButton = Instance.new("TextButton")
+KillAllButton.Name = "KillAllButton"
+KillAllButton.Size = UDim2.new(1, 0, 0, 40)
+KillAllButton.Position = UDim2.new(0, 0, 0, 50)
+KillAllButton.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+KillAllButton.Text = "KILL ALL"
+KillAllButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+KillAllButton.TextSize = 14
+KillAllButton.Font = Enum.Font.GothamBold
+KillAllButton.Parent = ButtonsContainer
 
--- Toggle Button Corner
-local ToggleCorner = Instance.new("UICorner")
-ToggleCorner.CornerRadius = UDim.new(0, 6)
-ToggleCorner.Parent = ToggleButton
+-- Function 3: ESP
+local ESPButton = Instance.new("TextButton")
+ESPButton.Name = "ESPButton"
+ESPButton.Size = UDim2.new(1, 0, 0, 40)
+ESPButton.Position = UDim2.new(0, 0, 0, 100)
+ESPButton.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+ESPButton.Text = "ESP: OFF"
+ESPButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+ESPButton.TextSize = 14
+ESPButton.Font = Enum.Font.GothamBold
+ESPButton.Parent = ButtonsContainer
 
--- Speed Controls Frame
+-- Function 4: Fly
+local FlyButton = Instance.new("TextButton")
+FlyButton.Name = "FlyButton"
+FlyButton.Size = UDim2.new(1, 0, 0, 40)
+FlyButton.Position = UDim2.new(0, 0, 0, 150)
+FlyButton.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+FlyButton.Text = "FLY: OFF"
+FlyButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+FlyButton.TextSize = 14
+FlyButton.Font = Enum.Font.GothamBold
+FlyButton.Parent = ButtonsContainer
+
+-- Function 5: HighJump
+local HighJumpButton = Instance.new("TextButton")
+HighJumpButton.Name = "HighJumpButton"
+HighJumpButton.Size = UDim2.new(1, 0, 0, 40)
+HighJumpButton.Position = UDim2.new(0, 0, 0, 200)
+HighJumpButton.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+HighJumpButton.Text = "HIGH JUMP: OFF"
+HighJumpButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+HighJumpButton.TextSize = 14
+HighJumpButton.Font = Enum.Font.GothamBold
+HighJumpButton.Parent = ButtonsContainer
+
+-- Speed Controls Frame (for Fly)
 local SpeedFrame = Instance.new("Frame")
 SpeedFrame.Name = "SpeedFrame"
 SpeedFrame.Size = UDim2.new(0.9, 0, 0, 40)
-SpeedFrame.Position = UDim2.new(0.05, 0, 0, 155)
+SpeedFrame.Position = UDim2.new(0.05, 0, 0, 310)
 SpeedFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 SpeedFrame.BackgroundTransparency = 0.5
 SpeedFrame.BorderSizePixel = 0
+SpeedFrame.Visible = false
 SpeedFrame.Parent = MainFrame
 
 -- Speed Frame Corner
@@ -143,47 +171,93 @@ SpeedDisplay.TextSize = 16
 SpeedDisplay.Font = Enum.Font.GothamBold
 SpeedDisplay.Parent = SpeedFrame
 
--- Mobile Controls Frame
-local MobileControls = Instance.new("Frame")
-MobileControls.Name = "MobileControls"
-MobileControls.Size = UDim2.new(0.9, 0, 0, 40)
-MobileControls.Position = UDim2.new(0.05, 0, 0, 205)
-MobileControls.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-MobileControls.BackgroundTransparency = 0.5
-MobileControls.BorderSizePixel = 0
-MobileControls.Visible = false
-MobileControls.Parent = MainFrame
-
--- Mobile Controls Corner
-local MobileCorner = Instance.new("UICorner")
-MobileCorner.CornerRadius = UDim.new(0, 6)
-MobileCorner.Parent = MobileControls
-
--- Forward Button
-local ForwardButton = Instance.new("TextButton")
-ForwardButton.Name = "ForwardButton"
-ForwardButton.Size = UDim2.new(0.3, 0, 0.8, 0)
-ForwardButton.Position = UDim2.new(0.35, 0, 0.1, 0)
-ForwardButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-ForwardButton.Text = "↑"
-ForwardButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ForwardButton.TextSize = 18
-ForwardButton.Font = Enum.Font.GothamBold
-ForwardButton.Visible = false
-ForwardButton.Parent = MobileControls
-
 -- Button corners
 local ButtonCorner = Instance.new("UICorner")
-ButtonCorner.CornerRadius = UDim.new(0, 4)
-ButtonCorner.Parent = DecreaseButton
-ButtonCorner:Clone().Parent = IncreaseButton
-ButtonCorner:Clone().Parent = ForwardButton
+ButtonCorner.CornerRadius = UDim.new(0, 6)
+ButtonCorner.Parent = SpeedHackButton
+ButtonCorner:Clone().Parent = KillAllButton
+ButtonCorner:Clone().Parent = ESPButton
+ButtonCorner:Clone().Parent = FlyButton
+ButtonCorner:Clone().Parent = HighJumpButton
+
+local SmallButtonCorner = Instance.new("UICorner")
+SmallButtonCorner.CornerRadius = UDim.new(0, 4)
+SmallButtonCorner.Parent = DecreaseButton
+SmallButtonCorner:Clone().Parent = IncreaseButton
 
 local DisplayCorner = Instance.new("UICorner")
 DisplayCorner.CornerRadius = UDim.new(0, 4)
 DisplayCorner.Parent = SpeedDisplay
 
--- Fly functions
+-- FUNCTION 1: SPEED HACK
+local function toggleSpeedHack()
+    speedHackEnabled = not speedHackEnabled
+    
+    if speedHackEnabled then
+        Humanoid.WalkSpeed = 50
+        SpeedHackButton.Text = "SPEED HACK: ON"
+        SpeedHackButton.TextColor3 = Color3.fromRGB(80, 255, 80)
+        SpeedHackButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    else
+        Humanoid.WalkSpeed = 16
+        SpeedHackButton.Text = "SPEED HACK: OFF"
+        SpeedHackButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+        SpeedHackButton.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    end
+end
+
+-- FUNCTION 2: KILL ALL
+local function killAll()
+    for _, player in pairs(game:GetService("Players"):GetPlayers()) do
+        if player ~= Player and player.Character then
+            local targetHumanoid = player.Character:FindFirstChild("Humanoid")
+            if targetHumanoid then
+                targetHumanoid.Health = 0
+            end
+        end
+    end
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Kill All",
+        Text = "All players killed!",
+        Duration = 3
+    })
+end
+
+-- FUNCTION 3: ESP
+local function toggleESP()
+    espEnabled = not espEnabled
+    
+    if espEnabled then
+        ESPButton.Text = "ESP: ON"
+        ESPButton.TextColor3 = Color3.fromRGB(80, 255, 80)
+        ESPButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+        
+        for _, player in pairs(game:GetService("Players"):GetPlayers()) do
+            if player ~= Player and player.Character then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "ESP_Highlight"
+                highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
+                highlight.Parent = player.Character
+            end
+        end
+    else
+        ESPButton.Text = "ESP: OFF"
+        ESPButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+        ESPButton.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+        
+        for _, player in pairs(game:GetService("Players"):GetPlayers()) do
+            if player.Character then
+                local highlight = player.Character:FindFirstChild("ESP_Highlight")
+                if highlight then
+                    highlight:Destroy()
+                end
+            end
+        end
+    end
+end
+
+-- FUNCTION 4: FLY
 local function createBodyVelocity()
     if bodyVelocity and bodyVelocity.Parent then
         bodyVelocity:Destroy()
@@ -196,99 +270,77 @@ local function createBodyVelocity()
     bodyVelocity.Parent = HumanoidRootPart
 end
 
-local function updateFlightControls()
-    if flightConnection then
-        flightConnection:Disconnect()
-    end
-    
-    flightConnection = game:GetService("RunService").Heartbeat:Connect(function()
-        if not flying or not bodyVelocity or not bodyVelocity.Parent then
-            return
-        end
-        
-        local camera = workspace.CurrentCamera
-        local moveDirection = Vector3.new(0, 0, 0)
-        
-        -- Always fly forward in camera direction when flying is enabled
-        moveDirection = camera.CFrame.LookVector * flySpeed
-        
-        bodyVelocity.Velocity = Vector3.new(moveDirection.X, moveDirection.Y, moveDirection.Z)
-    end)
-end
-
 local function toggleFly()
     flying = not flying
     
     if flying then
         createBodyVelocity()
         Humanoid.PlatformStand = true
-        updateFlightControls()
-        
-        -- Update GUI
-        StatusLabel.Text = "Status: ENABLED"
-        StatusLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
-        ToggleButton.Text = "DISABLE FLIGHT"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(80, 255, 80)
-        MobileControls.Visible = true
-        ForwardButton.Visible = true
         
         -- Auto-fly forward
-        wait(0.5)
-        if flying then
+        local camera = workspace.CurrentCamera
+        bodyVelocity.Velocity = camera.CFrame.LookVector * flySpeed
+        
+        FlyButton.Text = "FLY: ON"
+        FlyButton.TextColor3 = Color3.fromRGB(80, 255, 80)
+        FlyButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+        SpeedFrame.Visible = true
+        
+        -- Flight loop
+        game:GetService("RunService").Heartbeat:Connect(function()
+            if not flying or not bodyVelocity or not bodyVelocity.Parent then return end
             local camera = workspace.CurrentCamera
             bodyVelocity.Velocity = camera.CFrame.LookVector * flySpeed
-        end
+        end)
+        
     else
         if bodyVelocity then
             bodyVelocity:Destroy()
         end
-        if flightConnection then
-            flightConnection:Disconnect()
-        end
         Humanoid.PlatformStand = false
         
-        -- Update GUI
-        StatusLabel.Text = "Status: DISABLED"
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        ToggleButton.Text = "ENABLE FLIGHT"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-        MobileControls.Visible = false
-        ForwardButton.Visible = false
+        FlyButton.Text = "FLY: OFF"
+        FlyButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+        FlyButton.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+        SpeedFrame.Visible = false
     end
 end
 
+-- FUNCTION 5: HIGH JUMP
+local function toggleHighJump()
+    highJumpEnabled = not highJumpEnabled
+    
+    if highJumpEnabled then
+        Humanoid.JumpPower = 100
+        HighJumpButton.Text = "HIGH JUMP: ON"
+        HighJumpButton.TextColor3 = Color3.fromRGB(80, 255, 80)
+        HighJumpButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    else
+        Humanoid.JumpPower = 50
+        HighJumpButton.Text = "HIGH JUMP: OFF"
+        HighJumpButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+        HighJumpButton.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    end
+end
+
+-- Speed control for fly
 local function updateSpeed(change)
     flySpeed = math.clamp(flySpeed + change, 10, 200)
-    SpeedLabel.Text = "Speed: " .. flySpeed
     SpeedDisplay.Text = tostring(flySpeed)
-    
-    -- Update current flight speed if flying
-    if flying and bodyVelocity then
-        local camera = workspace.CurrentCamera
-        bodyVelocity.Velocity = camera.CFrame.LookVector * flySpeed
-    end
 end
 
 -- Connect events
-ToggleButton.MouseButton1Click:Connect(toggleFly)
-DecreaseButton.MouseButton1Click:Connect(function()
-    updateSpeed(-10)
-end)
-IncreaseButton.MouseButton1Click:Connect(function()
-    updateSpeed(10)
-end)
-
--- Mobile forward button
-ForwardButton.MouseButton1Click:Connect(function()
-    if flying and bodyVelocity then
-        local camera = workspace.CurrentCamera
-        bodyVelocity.Velocity = camera.CFrame.LookVector * flySpeed
-    end
-end)
+SpeedHackButton.MouseButton1Click:Connect(toggleSpeedHack)
+KillAllButton.MouseButton1Click:Connect(killAll)
+ESPButton.MouseButton1Click:Connect(toggleESP)
+FlyButton.MouseButton1Click:Connect(toggleFly)
+HighJumpButton.MouseButton1Click:Connect(toggleHighJump)
+DecreaseButton.MouseButton1Click:Connect(function() updateSpeed(-10) end)
+IncreaseButton.MouseButton1Click:Connect(function() updateSpeed(10) end)
 
 -- Notify user
 game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "Mobile Fly Script Loaded",
-    Text = "Auto-fly in camera direction!",
+    Title = "Multi-Function Menu Loaded",
+    Text = "5 functions available!",
     Duration = 5
 })
