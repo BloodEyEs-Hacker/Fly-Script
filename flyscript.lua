@@ -1,4 +1,4 @@
--- Fly Script with GUI
+-- Fly Script with GUI - Mobile Version
 local Player = game:GetService("Players").LocalPlayer
 local Character = Player.Character or Player.CharacterAdded:Wait()
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
@@ -19,7 +19,7 @@ ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 -- Main Frame
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 300, 0, 200)
+MainFrame.Size = UDim2.new(0, 300, 0, 250)
 MainFrame.Position = UDim2.new(0, 10, 0, 10)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
 MainFrame.BorderColor3 = Color3.fromRGB(0, 100, 255)
@@ -38,7 +38,7 @@ Title.Size = UDim2.new(1, 0, 0, 40)
 Title.Position = UDim2.new(0, 0, 0, 0)
 Title.BackgroundColor3 = Color3.fromRGB(0, 80, 200)
 Title.BackgroundTransparency = 0.5
-Title.Text = "FLIGHT CONTROL"
+Title.Text = "FLIGHT CONTROL - MOBILE"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 18
 Title.Font = Enum.Font.GothamBold
@@ -143,11 +143,41 @@ SpeedDisplay.TextSize = 16
 SpeedDisplay.Font = Enum.Font.GothamBold
 SpeedDisplay.Parent = SpeedFrame
 
+-- Mobile Controls Frame
+local MobileControls = Instance.new("Frame")
+MobileControls.Name = "MobileControls"
+MobileControls.Size = UDim2.new(0.9, 0, 0, 40)
+MobileControls.Position = UDim2.new(0.05, 0, 0, 205)
+MobileControls.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+MobileControls.BackgroundTransparency = 0.5
+MobileControls.BorderSizePixel = 0
+MobileControls.Visible = false
+MobileControls.Parent = MainFrame
+
+-- Mobile Controls Corner
+local MobileCorner = Instance.new("UICorner")
+MobileCorner.CornerRadius = UDim.new(0, 6)
+MobileCorner.Parent = MobileControls
+
+-- Forward Button
+local ForwardButton = Instance.new("TextButton")
+ForwardButton.Name = "ForwardButton"
+ForwardButton.Size = UDim2.new(0.3, 0, 0.8, 0)
+ForwardButton.Position = UDim2.new(0.35, 0, 0.1, 0)
+ForwardButton.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+ForwardButton.Text = "↑"
+ForwardButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ForwardButton.TextSize = 18
+ForwardButton.Font = Enum.Font.GothamBold
+ForwardButton.Visible = false
+ForwardButton.Parent = MobileControls
+
 -- Button corners
 local ButtonCorner = Instance.new("UICorner")
 ButtonCorner.CornerRadius = UDim.new(0, 4)
 ButtonCorner.Parent = DecreaseButton
 ButtonCorner:Clone().Parent = IncreaseButton
+ButtonCorner:Clone().Parent = ForwardButton
 
 local DisplayCorner = Instance.new("UICorner")
 DisplayCorner.CornerRadius = UDim.new(0, 4)
@@ -162,7 +192,7 @@ local function createBodyVelocity()
     bodyVelocity = Instance.new("BodyVelocity")
     bodyVelocity.Name = "FlyBodyVelocity"
     bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-    bodyVelocity.MaxForce = Vector3.new(0, 0, 0)
+    bodyVelocity.MaxForce = Vector3.new(40000, 40000, 40000)
     bodyVelocity.Parent = HumanoidRootPart
 end
 
@@ -179,36 +209,10 @@ local function updateFlightControls()
         local camera = workspace.CurrentCamera
         local moveDirection = Vector3.new(0, 0, 0)
         
-        -- Forward/Backward (W/S)
-        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.W) then
-            moveDirection = moveDirection + camera.CFrame.LookVector
-        end
-        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.S) then
-            moveDirection = moveDirection - camera.CFrame.LookVector
-        end
+        -- Always fly forward in camera direction when flying is enabled
+        moveDirection = camera.CFrame.LookVector * flySpeed
         
-        -- Left/Right (A/D)
-        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.A) then
-            moveDirection = moveDirection - camera.CFrame.RightVector
-        end
-        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.D) then
-            moveDirection = moveDirection + camera.CFrame.RightVector
-        end
-        
-        -- Up/Down (Space/Shift)
-        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.Space) then
-            moveDirection = moveDirection + Vector3.new(0, 1, 0)
-        end
-        if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.LeftShift) then
-            moveDirection = moveDirection + Vector3.new(0, -1, 0)
-        end
-        
-        -- Normalize and apply speed
-        if moveDirection.Magnitude > 0 then
-            moveDirection = moveDirection.Unit * flySpeed
-        end
-        
-        bodyVelocity.Velocity = moveDirection
+        bodyVelocity.Velocity = Vector3.new(moveDirection.X, moveDirection.Y, moveDirection.Z)
     end)
 end
 
@@ -217,7 +221,6 @@ local function toggleFly()
     
     if flying then
         createBodyVelocity()
-        bodyVelocity.MaxForce = Vector3.new(40000, 40000, 40000)
         Humanoid.PlatformStand = true
         updateFlightControls()
         
@@ -226,6 +229,15 @@ local function toggleFly()
         StatusLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
         ToggleButton.Text = "DISABLE FLIGHT"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(80, 255, 80)
+        MobileControls.Visible = true
+        ForwardButton.Visible = true
+        
+        -- Auto-fly forward
+        wait(0.5)
+        if flying then
+            local camera = workspace.CurrentCamera
+            bodyVelocity.Velocity = camera.CFrame.LookVector * flySpeed
+        end
     else
         if bodyVelocity then
             bodyVelocity:Destroy()
@@ -240,6 +252,8 @@ local function toggleFly()
         StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
         ToggleButton.Text = "ENABLE FLIGHT"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+        MobileControls.Visible = false
+        ForwardButton.Visible = false
     end
 end
 
@@ -247,6 +261,12 @@ local function updateSpeed(change)
     flySpeed = math.clamp(flySpeed + change, 10, 200)
     SpeedLabel.Text = "Speed: " .. flySpeed
     SpeedDisplay.Text = tostring(flySpeed)
+    
+    -- Update current flight speed if flying
+    if flying and bodyVelocity then
+        local camera = workspace.CurrentCamera
+        bodyVelocity.Velocity = camera.CFrame.LookVector * flySpeed
+    end
 end
 
 -- Connect events
@@ -258,18 +278,17 @@ IncreaseButton.MouseButton1Click:Connect(function()
     updateSpeed(10)
 end)
 
--- Key bind (F key to toggle)
-game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if input.KeyCode == Enum.KeyCode.F then
-        toggleFly()
+-- Mobile forward button
+ForwardButton.MouseButton1Click:Connect(function()
+    if flying and bodyVelocity then
+        local camera = workspace.CurrentCamera
+        bodyVelocity.Velocity = camera.CFrame.LookVector * flySpeed
     end
 end)
 
 -- Notify user
 game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "Fly Script Loaded",
-    Text = "GUI created! Press F to toggle flight",
+    Title = "Mobile Fly Script Loaded",
+    Text = "Auto-fly in camera direction!",
     Duration = 5
 })
