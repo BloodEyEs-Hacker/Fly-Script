@@ -1,6 +1,6 @@
--- Advanced Multi-Function Menu for Roblox
+-- Advanced Multi-Function Menu for Roblox - FIXED VERSION
 local Player = game:GetService("Players").LocalPlayer
-local Character = Player.Character or Player.CharacterAdded:Wait()
+local Character = Player.CharacterAdded:Wait()
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 local Humanoid = Character:WaitForChild("Humanoid")
 
@@ -11,10 +11,33 @@ local bodyVelocity
 local speedHackEnabled = false
 local highJumpEnabled = false
 local espEnabled = false
+local killAuraEnabled = false
 local currentTab = "Main"
 local minimized = false
 local dragging = false
 local dragInput, dragStart, startPos
+
+-- Replication fix for character respawn
+local function setupCharacter()
+    Character = Player.Character
+    if Character then
+        HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+        Humanoid = Character:WaitForChild("Humanoid")
+        
+        -- Reapply effects if they were enabled
+        if speedHackEnabled then
+            Humanoid.WalkSpeed = walkSpeed
+        end
+        if highJumpEnabled then
+            Humanoid.JumpPower = jumpPower
+        end
+        if flying then
+            toggleFly(false) -- Turn off flight on respawn
+        end
+    end
+end
+
+Player.CharacterAdded:Connect(setupCharacter)
 
 -- Create Main ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
@@ -22,10 +45,10 @@ ScreenGui.Name = "AdvancedMenuGUI"
 ScreenGui.Parent = Player.PlayerGui
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Main Window
+-- Main Window (HORIZONTAL)
 local MainWindow = Instance.new("Frame")
 MainWindow.Name = "MainWindow"
-MainWindow.Size = UDim2.new(0, 350, 0, 400)
+MainWindow.Size = UDim2.new(0, 600, 0, 350) -- Wider, less tall
 MainWindow.Position = UDim2.new(0, 10, 0, 10)
 MainWindow.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
 MainWindow.BorderColor3 = Color3.fromRGB(0, 100, 255)
@@ -57,7 +80,7 @@ TitleText.Name = "TitleText"
 TitleText.Size = UDim2.new(0.7, 0, 1, 0)
 TitleText.Position = UDim2.new(0, 10, 0, 0)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "ADVANCED MENU"
+TitleText.Text = "ADVANCED MENU v2.0"
 TitleText.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleText.TextSize = 16
 TitleText.Font = Enum.Font.GothamBold
@@ -94,21 +117,22 @@ SmallCorner.CornerRadius = UDim.new(0, 4)
 SmallCorner.Parent = MinimizeButton
 SmallCorner:Clone().Parent = CloseButton
 
--- Tabs Container
+-- Tabs Container (Horizontal layout)
 local TabsContainer = Instance.new("Frame")
 TabsContainer.Name = "TabsContainer"
-TabsContainer.Size = UDim2.new(1, 0, 0, 40)
-TabsContainer.Position = UDim2.new(0, 0, 0, 30)
+TabsContainer.Size = UDim2.new(1, -20, 0, 35)
+TabsContainer.Position = UDim2.new(0, 10, 0, 35)
 TabsContainer.BackgroundTransparency = 1
 TabsContainer.Parent = MainWindow
 
 -- Tab Buttons
-local tabs = {"Main", "Movement", "Visual", "Combat"}
+local tabs = {"Main", "Movement", "Visual", "Combat", "TP"}
+local tabFrames = {}
 
 for i, tabName in ipairs(tabs) do
     local TabButton = Instance.new("TextButton")
     TabButton.Name = tabName .. "Tab"
-    TabButton.Size = UDim2.new(1/#tabs, 0, 1, 0)
+    TabButton.Size = UDim2.new(1/#tabs, -5, 1, 0)
     TabButton.Position = UDim2.new((i-1)/#tabs, 0, 0, 0)
     TabButton.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
     TabButton.Text = tabName
@@ -118,11 +142,11 @@ for i, tabName in ipairs(tabs) do
     TabButton.Parent = TabsContainer
     
     local TabCorner = Instance.new("UICorner")
-    TabCorner.CornerRadius = UDim.new(0, 4)
+    TabCorner.CornerRadius = UDim.new(0, 6)
     TabCorner.Parent = TabButton
 end
 
--- Content Area
+-- Content Area (Wider for horizontal layout)
 local ContentArea = Instance.new("Frame")
 ContentArea.Name = "ContentArea"
 ContentArea.Size = UDim2.new(1, -20, 1, -80)
@@ -130,296 +154,148 @@ ContentArea.Position = UDim2.new(0, 10, 0, 75)
 ContentArea.BackgroundTransparency = 1
 ContentArea.Parent = MainWindow
 
--- MAIN TAB CONTENT
-local MainTab = Instance.new("Frame")
-MainTab.Name = "MainTab"
-MainTab.Size = UDim2.new(1, 0, 1, 0)
-MainTab.BackgroundTransparency = 1
-MainTab.Visible = true
-MainTab.Parent = ContentArea
+-- Function to create section
+local function createSection(parent, name, yPosition)
+    local section = Instance.new("TextLabel")
+    section.Size = UDim2.new(1, 0, 0, 20)
+    section.Position = UDim2.new(0, 0, 0, yPosition)
+    section.BackgroundTransparency = 1
+    section.Text = name
+    section.TextColor3 = Color3.fromRGB(0, 200, 255)
+    section.TextSize = 14
+    section.Font = Enum.Font.GothamBold
+    section.TextXAlignment = Enum.TextXAlignment.Left
+    section.Parent = parent
+    return section
+end
 
--- Quick Actions
-local QuickActions = Instance.new("TextLabel")
-QuickActions.Size = UDim2.new(1, 0, 0, 25)
-QuickActions.Position = UDim2.new(0, 0, 0, 0)
-QuickActions.BackgroundTransparency = 1
-QuickActions.Text = "QUICK ACTIONS"
-QuickActions.TextColor3 = Color3.fromRGB(0, 200, 255)
-QuickActions.TextSize = 14
-QuickActions.Font = Enum.Font.GothamBold
-QuickActions.TextXAlignment = Enum.TextXAlignment.Left
-QuickActions.Parent = MainTab
+-- Function to create toggle button
+local function createToggle(parent, name, yPosition, defaultState)
+    local toggle = Instance.new("TextButton")
+    toggle.Name = name
+    toggle.Size = UDim2.new(1, 0, 0, 30)
+    toggle.Position = UDim2.new(0, 0, 0, yPosition)
+    toggle.BackgroundColor3 = defaultState and Color3.fromRGB(80, 255, 80) or Color3.fromRGB(255, 60, 60)
+    toggle.Text = name .. ": " .. (defaultState and "ON" or "OFF")
+    toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggle.TextSize = 12
+    toggle.Font = Enum.Font.GothamBold
+    toggle.Parent = parent
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = toggle
+    
+    return toggle
+end
 
--- Kill All Button (Prison Life Version)
-local KillAllButton = Instance.new("TextButton")
-KillAllButton.Name = "KillAllButton"
-KillAllButton.Size = UDim2.new(1, 0, 0, 35)
-KillAllButton.Position = UDim2.new(0, 0, 0, 30)
-KillAllButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-KillAllButton.Text = "KILL ALL (PRISON LIFE)"
-KillAllButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-KillAllButton.TextSize = 14
-KillAllButton.Font = Enum.Font.GothamBold
-KillAllButton.Parent = MainTab
+-- Function to create slider
+local function createSlider(parent, label, yPosition, min, max, default)
+    local sliderFrame = Instance.new("Frame")
+    sliderFrame.Size = UDim2.new(1, 0, 0, 50)
+    sliderFrame.Position = UDim2.new(0, 0, 0, yPosition)
+    sliderFrame.BackgroundTransparency = 1
+    sliderFrame.Parent = parent
+    
+    local labelText = Instance.new("TextLabel")
+    labelText.Size = UDim2.new(1, 0, 0, 20)
+    labelText.Position = UDim2.new(0, 0, 0, 0)
+    labelText.BackgroundTransparency = 1
+    labelText.Text = label .. ": " .. default
+    labelText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    labelText.TextSize = 12
+    labelText.Font = Enum.Font.Gotham
+    labelText.TextXAlignment = Enum.TextXAlignment.Left
+    labelText.Parent = sliderFrame
+    
+    local minusBtn = Instance.new("TextButton")
+    minusBtn.Size = UDim2.new(0.2, 0, 0, 25)
+    minusBtn.Position = UDim2.new(0, 0, 0, 25)
+    minusBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
+    minusBtn.Text = "-"
+    minusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    minusBtn.TextSize = 16
+    minusBtn.Font = Enum.Font.GothamBold
+    minusBtn.Parent = sliderFrame
+    
+    local valueDisplay = Instance.new("TextLabel")
+    valueDisplay.Size = UDim2.new(0.6, 0, 0, 25)
+    valueDisplay.Position = UDim2.new(0.2, 0, 0, 25)
+    valueDisplay.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    valueDisplay.Text = tostring(default)
+    valueDisplay.TextColor3 = Color3.fromRGB(0, 200, 255)
+    valueDisplay.TextSize = 14
+    valueDisplay.Font = Enum.Font.GothamBold
+    valueDisplay.Parent = sliderFrame
+    
+    local plusBtn = Instance.new("TextButton")
+    plusBtn.Size = UDim2.new(0.2, 0, 0, 25)
+    plusBtn.Position = UDim2.new(0.8, 0, 0, 25)
+    plusBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
+    plusBtn.Text = "+"
+    plusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    plusBtn.TextSize = 16
+    plusBtn.Font = Enum.Font.GothamBold
+    plusBtn.Parent = sliderFrame
+    
+    -- Apply corners
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 4)
+    corner.Parent = minusBtn
+    corner:Clone().Parent = valueDisplay
+    corner:Clone().Parent = plusBtn
+    
+    return {
+        frame = sliderFrame,
+        label = labelText,
+        minus = minusBtn,
+        value = valueDisplay,
+        plus = plusBtn,
+        current = default,
+        min = min,
+        max = max
+    }
+end
 
--- MOVEMENT TAB CONTENT
-local MovementTab = Instance.new("Frame")
-MovementTab.Name = "MovementTab"
-MovementTab.Size = UDim2.new(1, 0, 1, 0)
-MovementTab.BackgroundTransparency = 1
-MovementTab.Visible = false
-MovementTab.Parent = ContentArea
+-- Create tab contents with horizontal layout
+for i, tabName in ipairs(tabs) do
+    local tabFrame = Instance.new("Frame")
+    tabFrame.Name = tabName .. "Tab"
+    tabFrame.Size = UDim2.new(1, 0, 1, 0)
+    tabFrame.BackgroundTransparency = 1
+    tabFrame.Visible = i == 1
+    tabFrame.Parent = ContentArea
+    tabFrames[tabName] = tabFrame
+end
 
--- Fly Section
-local FlySection = Instance.new("TextLabel")
-FlySection.Size = UDim2.new(1, 0, 0, 25)
-FlySection.Position = UDim2.new(0, 0, 0, 0)
-FlySection.BackgroundTransparency = 1
-FlySection.Text = "FLY"
-FlySection.TextColor3 = Color3.fromRGB(0, 200, 255)
-FlySection.TextSize = 14
-FlySection.Font = Enum.Font.GothamBold
-FlySection.TextXAlignment = Enum.TextXAlignment.Left
-FlySection.Parent = MovementTab
+-- MAIN TAB
+local MainTab = tabFrames.Main
+createSection(MainTab, "QUICK ACTIONS", 0)
+local KillAllBtn = createToggle(MainTab, "KILL ALL", 25, false)
+local KillAuraBtn = createToggle(MainTab, "KILL AURA", 60, false)
 
-local FlyToggle = Instance.new("TextButton")
-FlyToggle.Name = "FlyToggle"
-FlyToggle.Size = UDim2.new(1, 0, 0, 35)
-FlyToggle.Position = UDim2.new(0, 0, 0, 30)
-FlyToggle.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-FlyToggle.Text = "FLY: OFF"
-FlyToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-FlyToggle.TextSize = 14
-FlyToggle.Font = Enum.Font.GothamBold
-FlyToggle.Parent = MovementTab
+-- MOVEMENT TAB
+local MovementTab = tabFrames.Movement
+createSection(MovementTab, "FLIGHT", 0)
+local FlyToggle = createToggle(MovementTab, "FLY", 25, false)
+local FlySlider = createSlider(MovementTab, "Fly Speed", 60, 10, 200, 50)
 
--- Fly Speed Controls
-local FlySpeedLabel = Instance.new("TextLabel")
-FlySpeedLabel.Size = UDim2.new(1, 0, 0, 20)
-FlySpeedLabel.Position = UDim2.new(0, 0, 0, 75)
-FlySpeedLabel.BackgroundTransparency = 1
-FlySpeedLabel.Text = "Fly Speed: 50"
-FlySpeedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-FlySpeedLabel.TextSize = 12
-FlySpeedLabel.Font = Enum.Font.Gotham
-FlySpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
-FlySpeedLabel.Parent = MovementTab
+createSection(MovementTab, "SPEED", 120)
+local SpeedToggle = createToggle(MovementTab, "SPEED HACK", 145, false)
+local SpeedSlider = createSlider(MovementTab, "Walk Speed", 180, 16, 100, 16)
 
-local FlySpeedMinus = Instance.new("TextButton")
-FlySpeedMinus.Size = UDim2.new(0.2, 0, 0, 25)
-FlySpeedMinus.Position = UDim2.new(0, 0, 0, 100)
-FlySpeedMinus.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
-FlySpeedMinus.Text = "-"
-FlySpeedMinus.TextColor3 = Color3.fromRGB(255, 255, 255)
-FlySpeedMinus.TextSize = 16
-FlySpeedMinus.Font = Enum.Font.GothamBold
-FlySpeedMinus.Parent = MovementTab
+createSection(MovementTab, "JUMP", 240)
+local JumpToggle = createToggle(MovementTab, "HIGH JUMP", 265, false)
+local JumpSlider = createSlider(MovementTab, "Jump Power", 300, 50, 200, 50)
 
-local FlySpeedValue = Instance.new("TextLabel")
-FlySpeedValue.Size = UDim2.new(0.6, 0, 0, 25)
-FlySpeedValue.Position = UDim2.new(0.2, 0, 0, 100)
-FlySpeedValue.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-FlySpeedValue.Text = "50"
-FlySpeedValue.TextColor3 = Color3.fromRGB(0, 200, 255)
-FlySpeedValue.TextSize = 14
-FlySpeedValue.Font = Enum.Font.GothamBold
-FlySpeedValue.Parent = MovementTab
+-- VISUAL TAB
+local VisualTab = tabFrames.Visual
+createSection(VisualTab, "ESP SETTINGS", 0)
+local ESPToggle = createToggle(VisualTab, "ESP", 25, false)
+local TracersToggle = createToggle(VisualTab, "TRACERS", 60, false)
 
-local FlySpeedPlus = Instance.new("TextButton")
-FlySpeedPlus.Size = UDim2.new(0.2, 0, 0, 25)
-FlySpeedPlus.Position = UDim2.new(0.8, 0, 0, 100)
-FlySpeedPlus.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
-FlySpeedPlus.Text = "+"
-FlySpeedPlus.TextColor3 = Color3.fromRGB(255, 255, 255)
-FlySpeedPlus.TextSize = 16
-FlySpeedPlus.Font = Enum.Font.GothamBold
-FlySpeedPlus.Parent = MovementTab
-
--- Speed Hack Section
-local SpeedSection = Instance.new("TextLabel")
-SpeedSection.Size = UDim2.new(1, 0, 0, 25)
-SpeedSection.Position = UDim2.new(0, 0, 0, 140)
-SpeedSection.BackgroundTransparency = 1
-SpeedSection.Text = "SPEED HACK"
-SpeedSection.TextColor3 = Color3.fromRGB(0, 200, 255)
-SpeedSection.TextSize = 14
-SpeedSection.Font = Enum.Font.GothamBold
-SpeedSection.TextXAlignment = Enum.TextXAlignment.Left
-SpeedSection.Parent = MovementTab
-
-local SpeedToggle = Instance.new("TextButton")
-SpeedToggle.Name = "SpeedToggle"
-SpeedToggle.Size = UDim2.new(1, 0, 0, 35)
-SpeedToggle.Position = UDim2.new(0, 0, 0, 170)
-SpeedToggle.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-SpeedToggle.Text = "SPEED HACK: OFF"
-SpeedToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-SpeedToggle.TextSize = 14
-SpeedToggle.Font = Enum.Font.GothamBold
-SpeedToggle.Parent = MovementTab
-
--- Speed Value Controls
-local SpeedValueLabel = Instance.new("TextLabel")
-SpeedValueLabel.Size = UDim2.new(1, 0, 0, 20)
-SpeedValueLabel.Position = UDim2.new(0, 0, 0, 215)
-SpeedValueLabel.BackgroundTransparency = 1
-SpeedValueLabel.Text = "Walk Speed: 16"
-SpeedValueLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-SpeedValueLabel.TextSize = 12
-SpeedValueLabel.Font = Enum.Font.Gotham
-SpeedValueLabel.TextXAlignment = Enum.TextXAlignment.Left
-SpeedValueLabel.Parent = MovementTab
-
-local SpeedValueMinus = Instance.new("TextButton")
-SpeedValueMinus.Size = UDim2.new(0.2, 0, 0, 25)
-SpeedValueMinus.Position = UDim2.new(0, 0, 0, 240)
-SpeedValueMinus.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
-SpeedValueMinus.Text = "-"
-SpeedValueMinus.TextColor3 = Color3.fromRGB(255, 255, 255)
-SpeedValueMinus.TextSize = 16
-SpeedValueMinus.Font = Enum.Font.GothamBold
-SpeedValueMinus.Parent = MovementTab
-
-local SpeedValueDisplay = Instance.new("TextLabel")
-SpeedValueDisplay.Size = UDim2.new(0.6, 0, 0, 25)
-SpeedValueDisplay.Position = UDim2.new(0.2, 0, 0, 240)
-SpeedValueDisplay.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-SpeedValueDisplay.Text = "16"
-SpeedValueDisplay.TextColor3 = Color3.fromRGB(0, 200, 255)
-SpeedValueDisplay.TextSize = 14
-SpeedValueDisplay.Font = Enum.Font.GothamBold
-SpeedValueDisplay.Parent = MovementTab
-
-local SpeedValuePlus = Instance.new("TextButton")
-SpeedValuePlus.Size = UDim2.new(0.2, 0, 0, 25)
-SpeedValuePlus.Position = UDim2.new(0.8, 0, 0, 240)
-SpeedValuePlus.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
-SpeedValuePlus.Text = "+"
-SpeedValuePlus.TextColor3 = Color3.fromRGB(255, 255, 255)
-SpeedValuePlus.TextSize = 16
-SpeedValuePlus.Font = Enum.Font.GothamBold
-SpeedValuePlus.Parent = MovementTab
-
--- High Jump Section
-local JumpSection = Instance.new("TextLabel")
-JumpSection.Size = UDim2.new(1, 0, 0, 25)
-JumpSection.Position = UDim2.new(0, 0, 0, 280)
-JumpSection.BackgroundTransparency = 1
-JumpSection.Text = "HIGH JUMP"
-JumpSection.TextColor3 = Color3.fromRGB(0, 200, 255)
-JumpSection.TextSize = 14
-JumpSection.Font = Enum.Font.GothamBold
-JumpSection.TextXAlignment = Enum.TextXAlignment.Left
-JumpSection.Parent = MovementTab
-
-local JumpToggle = Instance.new("TextButton")
-JumpToggle.Name = "JumpToggle"
-JumpToggle.Size = UDim2.new(1, 0, 0, 35)
-JumpToggle.Position = UDim2.new(0, 0, 0, 310)
-JumpToggle.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-JumpToggle.Text = "HIGH JUMP: OFF"
-JumpToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-JumpToggle.TextSize = 14
-JumpToggle.Font = Enum.Font.GothamBold
-JumpToggle.Parent = MovementTab
-
--- Jump Power Controls
-local JumpPowerLabel = Instance.new("TextLabel")
-JumpPowerLabel.Size = UDim2.new(1, 0, 0, 20)
-JumpPowerLabel.Position = UDim2.new(0, 0, 0, 355)
-JumpPowerLabel.BackgroundTransparency = 1
-JumpPowerLabel.Text = "Jump Power: 50"
-JumpPowerLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-JumpPowerLabel.TextSize = 12
-JumpPowerLabel.Font = Enum.Font.Gotham
-JumpPowerLabel.TextXAlignment = Enum.TextXAlignment.Left
-JumpPowerLabel.Parent = MovementTab
-
-local JumpPowerMinus = Instance.new("TextButton")
-JumpPowerMinus.Size = UDim2.new(0.2, 0, 0, 25)
-JumpPowerMinus.Position = UDim2.new(0, 0, 0, 380)
-JumpPowerMinus.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
-JumpPowerMinus.Text = "-"
-JumpPowerMinus.TextColor3 = Color3.fromRGB(255, 255, 255)
-JumpPowerMinus.TextSize = 16
-JumpPowerMinus.Font = Enum.Font.GothamBold
-JumpPowerMinus.Parent = MovementTab
-
-local JumpPowerDisplay = Instance.new("TextLabel")
-JumpPowerDisplay.Size = UDim2.new(0.6, 0, 0, 25)
-JumpPowerDisplay.Position = UDim2.new(0.2, 0, 0, 380)
-JumpPowerDisplay.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-JumpPowerDisplay.Text = "50"
-JumpPowerDisplay.TextColor3 = Color3.fromRGB(0, 200, 255)
-JumpPowerDisplay.TextSize = 14
-JumpPowerDisplay.Font = Enum.Font.GothamBold
-JumpPowerDisplay.Parent = MovementTab
-
-local JumpPowerPlus = Instance.new("TextButton")
-JumpPowerPlus.Size = UDim2.new(0.2, 0, 0, 25)
-JumpPowerPlus.Position = UDim2.new(0.8, 0, 0, 380)
-JumpPowerPlus.BackgroundColor3 = Color3.fromRGB(0, 100, 255)
-JumpPowerPlus.Text = "+"
-JumpPowerPlus.TextColor3 = Color3.fromRGB(255, 255, 255)
-JumpPowerPlus.TextSize = 16
-JumpPowerPlus.Font = Enum.Font.GothamBold
-JumpPowerPlus.Parent = MovementTab
-
--- VISUAL TAB CONTENT
-local VisualTab = Instance.new("Frame")
-VisualTab.Name = "VisualTab"
-VisualTab.Size = UDim2.new(1, 0, 1, 0)
-VisualTab.BackgroundTransparency = 1
-VisualTab.Visible = false
-VisualTab.Parent = ContentArea
-
--- ESP Section
-local ESPSection = Instance.new("TextLabel")
-ESPSection.Size = UDim2.new(1, 0, 0, 25)
-ESPSection.Position = UDim2.new(0, 0, 0, 0)
-ESPSection.BackgroundTransparency = 1
-ESPSection.Text = "ESP SETTINGS"
-ESPSection.TextColor3 = Color3.fromRGB(0, 200, 255)
-ESPSection.TextSize = 14
-ESPSection.Font = Enum.Font.GothamBold
-ESPSection.TextXAlignment = Enum.TextXAlignment.Left
-ESPSection.Parent = VisualTab
-
-local ESPToggle = Instance.new("TextButton")
-ESPToggle.Name = "ESPToggle"
-ESPToggle.Size = UDim2.new(1, 0, 0, 35)
-ESPToggle.Position = UDim2.new(0, 0, 0, 30)
-ESPToggle.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-ESPToggle.Text = "ESP: OFF"
-ESPToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-ESPToggle.TextSize = 14
-ESPToggle.Font = Enum.Font.GothamBold
-ESPToggle.Parent = VisualTab
-
--- Tracers Toggle
-local TracersToggle = Instance.new("TextButton")
-TracersToggle.Name = "TracersToggle"
-TracersToggle.Size = UDim2.new(1, 0, 0, 35)
-TracersToggle.Position = UDim2.new(0, 0, 0, 75)
-TracersToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-TracersToggle.Text = "TRACERS: OFF"
-TracersToggle.TextColor3 = Color3.fromRGB(255, 80, 80)
-TracersToggle.TextSize = 14
-TracersToggle.Font = Enum.Font.GothamBold
-TracersToggle.Parent = VisualTab
-
--- ESP Color Selection
-local ColorSection = Instance.new("TextLabel")
-ColorSection.Size = UDim2.new(1, 0, 0, 25)
-ColorSection.Position = UDim2.new(0, 0, 0, 120)
-ColorSection.BackgroundTransparency = 1
-ColorSection.Text = "ESP COLOR"
-ColorSection.TextColor3 = Color3.fromRGB(0, 200, 255)
-ColorSection.TextSize = 14
-ColorSection.Font = Enum.Font.GothamBold
-ColorSection.TextXAlignment = Enum.TextXAlignment.Left
-ColorSection.Parent = VisualTab
-
+createSection(VisualTab, "COLORS", 105)
+-- Color buttons in horizontal layout
 local colors = {
     {Name = "RED", Color = Color3.fromRGB(255, 0, 0)},
     {Name = "GREEN", Color = Color3.fromRGB(0, 255, 0)},
@@ -430,85 +306,196 @@ local colors = {
 for i, colorInfo in ipairs(colors) do
     local ColorButton = Instance.new("TextButton")
     ColorButton.Name = colorInfo.Name .. "Color"
-    ColorButton.Size = UDim2.new(0.48, 0, 0, 30)
-    ColorButton.Position = UDim2.new((i-1)%2 * 0.5, 0, 0, 150 + math.floor((i-1)/2)*35)
+    ColorButton.Size = UDim2.new(0.23, 0, 0, 25)
+    ColorButton.Position = UDim2.new((i-1)*0.25, 0, 0, 130)
     ColorButton.BackgroundColor3 = colorInfo.Color
     ColorButton.Text = colorInfo.Name
     ColorButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ColorButton.TextSize = 12
+    ColorButton.TextSize = 10
     ColorButton.Font = Enum.Font.GothamBold
     ColorButton.Parent = VisualTab
-end
-
--- COMBAT TAB CONTENT
-local CombatTab = Instance.new("Frame")
-CombatTab.Name = "CombatTab"
-CombatTab.Size = UDim2.new(1, 0, 1, 0)
-CombatTab.BackgroundTransparency = 1
-CombatTab.Visible = false
-CombatTab.Parent = ContentArea
-
--- Apply corners to all buttons
-local function applyCorner(button)
+    
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = button
+    corner.CornerRadius = UDim.new(0, 4)
+    corner.Parent = ColorButton
 end
 
-applyCorner(FlyToggle)
-applyCorner(FlySpeedMinus)
-applyCorner(FlySpeedValue)
-applyCorner(FlySpeedPlus)
-applyCorner(SpeedToggle)
-applyCorner(SpeedValueMinus)
-applyCorner(SpeedValueDisplay)
-applyCorner(SpeedValuePlus)
-applyCorner(JumpToggle)
-applyCorner(JumpPowerMinus)
-applyCorner(JumpPowerDisplay)
-applyCorner(JumpPowerPlus)
-applyCorner(ESPToggle)
-applyCorner(TracersToggle)
-applyCorner(KillAllButton)
+-- COMBAT TAB
+local CombatTab = tabFrames.Combat
+createSection(CombatTab, "COMBAT SETTINGS", 0)
+local KillAuraCombatBtn = createToggle(CombatTab, "KILL AURA", 25, false)
+local KillAuraRangeSlider = createSlider(CombatTab, "Aura Range", 60, 5, 50, 15)
 
-for i, colorInfo in ipairs(colors) do
-    applyCorner(VisualTab:FindFirstChild(colorInfo.Name .. "Color"))
-end
+-- TP TAB
+local TPTab = tabFrames.TP
+createSection(TPTab, "TELEPORT", 0)
 
--- VARIABLES FOR FUNCTIONS
+-- Player list for TP
+local playerScroll = Instance.new("ScrollingFrame")
+playerScroll.Size = UDim2.new(1, 0, 1, -40)
+playerScroll.Position = UDim2.new(0, 0, 0, 25)
+playerScroll.BackgroundTransparency = 1
+playerScroll.ScrollBarThickness = 6
+playerScroll.Parent = TPTab
+
+local playerListLayout = Instance.new("UIListLayout")
+playerListLayout.Parent = playerScroll
+
+-- VARIABLES
 local walkSpeed = 16
 local jumpPower = 50
 local espColor = Color3.fromRGB(255, 0, 0)
 local tracersEnabled = false
+local killAuraRange = 15
 local espHighlights = {}
 local tracerLines = {}
+local killAuraConnection
 
--- FUNCTION: KILL ALL (Prison Life Version)
-local function prisonLifeKillAll()
-    local players = game:GetService("Players"):GetPlayers()
-    local killed = 0
+-- FIXED ESP SYSTEM
+local function updateESP()
+    -- Clear existing ESP
+    for player, highlight in pairs(espHighlights) do
+        if highlight then
+            highlight:Destroy()
+        end
+    end
+    for player, line in pairs(tracerLines) do
+        if line then
+            line:Destroy()
+        end
+    end
+    espHighlights = {}
+    tracerLines = {}
     
-    for _, player in pairs(players) do
-        if player ~= Player and player.Character then
-            local humanoid = player.Character:FindFirstChild("Humanoid")
-            local tool = Player.Character and Player.Character:FindFirstChildOfClass("Tool")
+    if not espEnabled then return end
+    
+    for _, player in pairs(game:GetService("Players"):GetPlayers()) do
+        if player ~= Player then
+            -- Create ESP for existing characters
+            if player.Character then
+                createESPForPlayer(player)
+            end
             
-            if humanoid and tool then
-                -- Simulate weapon hit
-                humanoid:TakeDamage(100)
-                killed = killed + 1
+            -- Listen for new characters
+            player.CharacterAdded:Connect(function(char)
+                if espEnabled then
+                    wait(0.5) -- Wait for character to load
+                    createESPForPlayer(player)
+                end
+            end)
+        end
+    end
+end
+
+local function createESPForPlayer(player)
+    if not player.Character then return end
+    
+    -- Create Highlight
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ESP_Highlight"
+    highlight.FillColor = espColor
+    highlight.OutlineColor = espColor
+    highlight.FillTransparency = 0.3
+    highlight.OutlineTransparency = 0
+    highlight.Parent = player.Character
+    espHighlights[player] = highlight
+    
+    -- Create Tracer if enabled
+    if tracersEnabled then
+        local tracer = Instance.new("Line")
+        tracer.Name = "ESP_Tracer"
+        tracer.Color = espColor
+        tracer.Thickness = 2
+        tracer.ZIndex = 1
+        tracer.Parent = ScreenGui
+        
+        -- Store both line and connection
+        tracerLines[player] = {
+            line = tracer,
+            connection = game:GetService("RunService").RenderStepped:Connect(function()
+                if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and Character and HumanoidRootPart then
+                    local rootPart = player.Character.HumanoidRootPart
+                    tracer.Visible = true
+                    tracer.From = Vector3.new(0, 0, 0) -- Camera position doesn't work well on mobile
+                    tracer.To = rootPart.Position
+                else
+                    tracer.Visible = false
+                end
+            end)
+        }
+    end
+    
+    -- Handle character removal
+    player.CharacterRemoving:Connect(function()
+        if espHighlights[player] then
+            espHighlights[player]:Destroy()
+            espHighlights[player] = nil
+        end
+        if tracerLines[player] then
+            tracerLines[player].connection:Disconnect()
+            tracerLines[player].line:Destroy()
+            tracerLines[player] = nil
+        end
+    end)
+end
+
+-- FIXED KILL AURA
+local function killAura()
+    if not killAuraEnabled or not Character then return end
+    
+    for _, player in pairs(game:GetService("Players"):GetPlayers()) do
+        if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local targetRoot = player.Character.HumanoidRootPart
+            local distance = (HumanoidRootPart.Position - targetRoot.Position).Magnitude
+            
+            if distance <= killAuraRange then
+                local humanoid = player.Character:FindFirstChild("Humanoid")
+                if humanoid and humanoid.Health > 0 then
+                    humanoid.Health = 0
+                end
             end
         end
     end
-    
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Prison Life Kill All",
-        Text = "Attempted to kill " .. killed .. " players",
-        Duration = 3
-    })
 end
 
--- FUNCTION: FLY
+-- FIXED KILL ALL with Teleport
+local function killAll()
+    local players = game:GetService("Players"):GetPlayers()
+    local validPlayers = {}
+    
+    -- Collect valid targets
+    for _, player in pairs(players) do
+        if player ~= Player and player.Character and player.Character:FindFirstChild("Humanoid") then
+            table.insert(validPlayers, player)
+        end
+    end
+    
+    -- Teleport and kill each player
+    for _, player in pairs(validPlayers) do
+        local targetRoot = player.Character.HumanoidRootPart
+        if targetRoot then
+            -- Save current position
+            local savedPosition = HumanoidRootPart.Position
+            
+            -- Teleport to player
+            HumanoidRootPart.CFrame = CFrame.new(targetRoot.Position + Vector3.new(0, 3, 0))
+            wait(0.2)
+            
+            -- Kill player
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.Health = 0
+            end
+            
+            -- Wait a bit and return to original position
+            wait(0.5)
+            HumanoidRootPart.CFrame = CFrame.new(savedPosition)
+            wait(0.5)
+        end
+    end
+end
+
+-- FIXED FLY with respawn support
 local function createBodyVelocity()
     if bodyVelocity and bodyVelocity.Parent then
         bodyVelocity:Destroy()
@@ -521,23 +508,27 @@ local function createBodyVelocity()
     bodyVelocity.Parent = HumanoidRootPart
 end
 
-local function toggleFly()
-    flying = not flying
+local function toggleFly(state)
+    if state ~= nil then
+        flying = state
+    else
+        flying = not flying
+    end
     
-    if flying then
+    if flying and HumanoidRootPart then
         createBodyVelocity()
         Humanoid.PlatformStand = true
-        
-        -- Auto-fly forward
-        local camera = workspace.CurrentCamera
-        bodyVelocity.Velocity = camera.CFrame.LookVector * flySpeed
         
         FlyToggle.Text = "FLY: ON"
         FlyToggle.BackgroundColor3 = Color3.fromRGB(80, 255, 80)
         
         -- Flight loop
-        game:GetService("RunService").Heartbeat:Connect(function()
-            if not flying or not bodyVelocity or not bodyVelocity.Parent then return end
+        local flightLoop
+        flightLoop = game:GetService("RunService").Heartbeat:Connect(function()
+            if not flying or not bodyVelocity or not bodyVelocity.Parent or not Character then
+                flightLoop:Disconnect()
+                return
+            end
             local camera = workspace.CurrentCamera
             bodyVelocity.Velocity = camera.CFrame.LookVector * flySpeed
         end)
@@ -546,92 +537,49 @@ local function toggleFly()
         if bodyVelocity then
             bodyVelocity:Destroy()
         end
-        Humanoid.PlatformStand = false
+        if Humanoid then
+            Humanoid.PlatformStand = false
+        end
         
         FlyToggle.Text = "FLY: OFF"
         FlyToggle.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
     end
 end
 
--- FUNCTION: SPEED HACK
+-- FIXED Movement functions with respawn support
 local function toggleSpeedHack()
     speedHackEnabled = not speedHackEnabled
     
-    if speedHackEnabled then
+    if speedHackEnabled and Humanoid then
         Humanoid.WalkSpeed = walkSpeed
         SpeedToggle.Text = "SPEED HACK: ON"
         SpeedToggle.BackgroundColor3 = Color3.fromRGB(80, 255, 80)
     else
-        Humanoid.WalkSpeed = 16
+        if Humanoid then
+            Humanoid.WalkSpeed = 16
+        end
         SpeedToggle.Text = "SPEED HACK: OFF"
         SpeedToggle.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
     end
 end
 
--- FUNCTION: HIGH JUMP
 local function toggleHighJump()
     highJumpEnabled = not highJumpEnabled
     
-    if highJumpEnabled then
+    if highJumpEnabled and Humanoid then
         Humanoid.JumpPower = jumpPower
         JumpToggle.Text = "HIGH JUMP: ON"
         JumpToggle.BackgroundColor3 = Color3.fromRGB(80, 255, 80)
     else
-        Humanoid.JumpPower = 50
+        if Humanoid then
+            Humanoid.JumpPower = 50
+        end
         JumpToggle.Text = "HIGH JUMP: OFF"
         JumpToggle.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
     end
 end
 
--- FUNCTION: ESP
-local function updateESP()
-    -- Clear existing ESP
-    for _, highlight in pairs(espHighlights) do
-        highlight:Destroy()
-    end
-    for _, line in pairs(tracerLines) do
-        line:Destroy()
-    end
-    espHighlights = {}
-    tracerLines = {}
-    
-    if espEnabled then
-        for _, player in pairs(game:GetService("Players"):GetPlayers()) do
-            if player ~= Player and player.Character then
-                -- Create Highlight
-                local highlight = Instance.new("Highlight")
-                highlight.Name = "ESP_Highlight"
-                highlight.FillColor = espColor
-                highlight.OutlineColor = espColor
-                highlight.FillTransparency = 0.3
-                highlight.OutlineTransparency = 0
-                highlight.Parent = player.Character
-                espHighlights[player] = highlight
-                
-                -- Create Tracer if enabled
-                if tracersEnabled then
-                    local tracer = Instance.new("Line")
-                    tracer.Name = "ESP_Tracer"
-                    tracer.Color = espColor
-                    tracer.Thickness = 2
-                    tracer.Parent = game:GetService("CoreGui")
-                    tracerLines[player] = tracer
-                    
-                    -- Update tracer position
-                    game:GetService("RunService").RenderStepped:Connect(function()
-                        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                            local rootPart = player.Character.HumanoidRootPart
-                            local camera = workspace.CurrentCamera
-                            tracer.From = camera.CFrame.Position
-                            tracer.To = rootPart.Position
-                        end
-                    end)
-                end
-            end
-        end
-    end
-end
-
+-- FIXED ESP Toggle
 local function toggleESP()
     espEnabled = not espEnabled
     
@@ -648,17 +596,64 @@ end
 
 local function toggleTracers()
     tracersEnabled = not tracersEnabled
-    
-    if tracersEnabled then
-        TracersToggle.Text = "TRACERS: ON"
-        TracersToggle.BackgroundColor3 = Color3.fromRGB(80, 255, 80)
-    else
-        TracersToggle.Text = "TRACERS: OFF"
-        TracersToggle.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-    end
+    TracersToggle.Text = "TRACERS: " .. (tracersEnabled and "ON" or "OFF")
+    TracersToggle.BackgroundColor3 = tracersEnabled and Color3.fromRGB(80, 255, 80) or Color3.fromRGB(255, 60, 60)
     
     if espEnabled then
         updateESP()
+    end
+end
+
+-- FIXED KILL AURA Toggle
+local function toggleKillAura()
+    killAuraEnabled = not killAuraEnabled
+    
+    if killAuraEnabled then
+        KillAuraBtn.Text = "KILL AURA: ON"
+        KillAuraBtn.BackgroundColor3 = Color3.fromRGB(80, 255, 80)
+        KillAuraCombatBtn.Text = "KILL AURA: ON"
+        KillAuraCombatBtn.BackgroundColor3 = Color3.fromRGB(80, 255, 80)
+        
+        killAuraConnection = game:GetService("RunService").Heartbeat:Connect(killAura)
+    else
+        KillAuraBtn.Text = "KILL AURA: OFF"
+        KillAuraBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+        KillAuraCombatBtn.Text = "KILL AURA: OFF"
+        KillAuraCombatBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+        
+        if killAuraConnection then
+            killAuraConnection:Disconnect()
+        end
+    end
+end
+
+-- TELEPORT FUNCTIONS
+local function updatePlayerList()
+    playerScroll:ClearAllChildren()
+    
+    local players = game:GetService("Players"):GetPlayers()
+    for i, player in pairs(players) do
+        if player ~= Player then
+            local playerBtn = Instance.new("TextButton")
+            playerBtn.Size = UDim2.new(1, -10, 0, 30)
+            playerBtn.Position = UDim2.new(0, 5, 0, (i-1)*35)
+            playerBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+            playerBtn.Text = player.Name
+            playerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            playerBtn.TextSize = 12
+            playerBtn.Font = Enum.Font.Gotham
+            playerBtn.Parent = playerScroll
+            
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0, 6)
+            corner.Parent = playerBtn
+            
+            playerBtn.MouseButton1Click:Connect(function()
+                if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame
+                end
+            end)
+        end
     end
 end
 
@@ -694,14 +689,19 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
     end
 end)
 
--- MINIMIZE FUNCTION
+-- FIXED MINIMIZE (only hides background)
 local function toggleMinimize()
     minimized = not minimized
     if minimized then
-        MainWindow.Size = UDim2.new(0, 350, 0, 30)
+        -- Only hide the background, keep buttons visible
+        MainWindow.BackgroundTransparency = 1
+        MainWindow.BorderSizePixel = 0
+        TitleBar.BackgroundTransparency = 1
         MinimizeButton.Text = "+"
     else
-        MainWindow.Size = UDim2.new(0, 350, 0, 400)
+        MainWindow.BackgroundTransparency = 0
+        MainWindow.BorderSizePixel = 2
+        TitleBar.BackgroundTransparency = 0.3
         MinimizeButton.Text = "_"
     end
 end
@@ -711,20 +711,18 @@ local function switchTab(tabName)
     currentTab = tabName
     
     -- Hide all tabs
-    MainTab.Visible = false
-    MovementTab.Visible = false
-    VisualTab.Visible = false
-    CombatTab.Visible = false
+    for name, frame in pairs(tabFrames) do
+        frame.Visible = false
+    end
     
     -- Show selected tab
-    if tabName == "Main" then
-        MainTab.Visible = true
-    elseif tabName == "Movement" then
-        MovementTab.Visible = true
-    elseif tabName == "Visual" then
-        VisualTab.Visible = true
-    elseif tabName == "Combat" then
-        CombatTab.Visible = true
+    if tabFrames[tabName] then
+        tabFrames[tabName].Visible = true
+    end
+    
+    -- Update player list for TP tab
+    if tabName == "TP" then
+        updatePlayerList()
     end
     
     -- Update tab buttons
@@ -759,60 +757,74 @@ for _, tabName in ipairs(tabs) do
 end
 
 -- Function buttons
-KillAllButton.MouseButton1Click:Connect(prisonLifeKillAll)
+KillAllBtn.MouseButton1Click:Connect(killAll)
+KillAuraBtn.MouseButton1Click:Connect(toggleKillAura)
+KillAuraCombatBtn.MouseButton1Click:Connect(toggleKillAura)
 FlyToggle.MouseButton1Click:Connect(toggleFly)
 SpeedToggle.MouseButton1Click:Connect(toggleSpeedHack)
 JumpToggle.MouseButton1Click:Connect(toggleHighJump)
 ESPToggle.MouseButton1Click:Connect(toggleESP)
 TracersToggle.MouseButton1Click:Connect(toggleTracers)
 
--- Speed controls
-FlySpeedMinus.MouseButton1Click:Connect(function()
-    flySpeed = math.max(10, flySpeed - 10)
-    FlySpeedValue.Text = tostring(flySpeed)
-    FlySpeedLabel.Text = "Fly Speed: " .. flySpeed
+-- Slider controls
+FlySlider.minus.MouseButton1Click:Connect(function()
+    flySpeed = math.max(FlySlider.min, flySpeed - 10)
+    FlySlider.value.Text = tostring(flySpeed)
+    FlySlider.label.Text = "Fly Speed: " .. flySpeed
 end)
 
-FlySpeedPlus.MouseButton1Click:Connect(function()
-    flySpeed = math.min(200, flySpeed + 10)
-    FlySpeedValue.Text = tostring(flySpeed)
-    FlySpeedLabel.Text = "Fly Speed: " .. flySpeed
+FlySlider.plus.MouseButton1Click:Connect(function()
+    flySpeed = math.min(FlySlider.max, flySpeed + 10)
+    FlySlider.value.Text = tostring(flySpeed)
+    FlySlider.label.Text = "Fly Speed: " .. flySpeed
 end)
 
-SpeedValueMinus.MouseButton1Click:Connect(function()
-    walkSpeed = math.max(16, walkSpeed - 5)
-    SpeedValueDisplay.Text = tostring(walkSpeed)
-    SpeedValueLabel.Text = "Walk Speed: " .. walkSpeed
-    if speedHackEnabled then
+SpeedSlider.minus.MouseButton1Click:Connect(function()
+    walkSpeed = math.max(SpeedSlider.min, walkSpeed - 5)
+    SpeedSlider.value.Text = tostring(walkSpeed)
+    SpeedSlider.label.Text = "Walk Speed: " .. walkSpeed
+    if speedHackEnabled and Humanoid then
         Humanoid.WalkSpeed = walkSpeed
     end
 end)
 
-SpeedValuePlus.MouseButton1Click:Connect(function()
-    walkSpeed = math.min(100, walkSpeed + 5)
-    SpeedValueDisplay.Text = tostring(walkSpeed)
-    SpeedValueLabel.Text = "Walk Speed: " .. walkSpeed
-    if speedHackEnabled then
+SpeedSlider.plus.MouseButton1Click:Connect(function()
+    walkSpeed = math.min(SpeedSlider.max, walkSpeed + 5)
+    SpeedSlider.value.Text = tostring(walkSpeed)
+    SpeedSlider.label.Text = "Walk Speed: " .. walkSpeed
+    if speedHackEnabled and Humanoid then
         Humanoid.WalkSpeed = walkSpeed
     end
 end)
 
-JumpPowerMinus.MouseButton1Click:Connect(function()
-    jumpPower = math.max(50, jumpPower - 10)
-    JumpPowerDisplay.Text = tostring(jumpPower)
-    JumpPowerLabel.Text = "Jump Power: " .. jumpPower
-    if highJumpEnabled then
+JumpSlider.minus.MouseButton1Click:Connect(function()
+    jumpPower = math.max(JumpSlider.min, jumpPower - 10)
+    JumpSlider.value.Text = tostring(jumpPower)
+    JumpSlider.label.Text = "Jump Power: " .. jumpPower
+    if highJumpEnabled and Humanoid then
         Humanoid.JumpPower = jumpPower
     end
 end)
 
-JumpPowerPlus.MouseButton1Click:Connect(function()
-    jumpPower = math.min(200, jumpPower + 10)
-    JumpPowerDisplay.Text = tostring(jumpPower)
-    JumpPowerLabel.Text = "Jump Power: " .. jumpPower
-    if highJumpEnabled then
+JumpSlider.plus.MouseButton1Click:Connect(function()
+    jumpPower = math.min(JumpSlider.max, jumpPower + 10)
+    JumpSlider.value.Text = tostring(jumpPower)
+    JumpSlider.label.Text = "Jump Power: " .. jumpPower
+    if highJumpEnabled and Humanoid then
         Humanoid.JumpPower = jumpPower
     end
+end)
+
+KillAuraRangeSlider.minus.MouseButton1Click:Connect(function()
+    killAuraRange = math.max(KillAuraRangeSlider.min, killAuraRange - 5)
+    KillAuraRangeSlider.value.Text = tostring(killAuraRange)
+    KillAuraRangeSlider.label.Text = "Aura Range: " .. killAuraRange
+end)
+
+KillAuraRangeSlider.plus.MouseButton1Click:Connect(function()
+    killAuraRange = math.min(KillAuraRangeSlider.max, killAuraRange + 5)
+    KillAuraRangeSlider.value.Text = tostring(killAuraRange)
+    KillAuraRangeSlider.label.Text = "Aura Range: " .. killAuraRange
 end)
 
 -- Color buttons
@@ -831,9 +843,13 @@ end
 -- Initial setup
 switchTab("Main")
 
+-- Auto-update player list
+game:GetService("Players").PlayerAdded:Connect(updatePlayerList)
+game:GetService("Players").PlayerRemoving:Connect(updatePlayerList)
+
 -- Notify user
 game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "Advanced Menu Loaded",
-    Text = "4 tabs with drag & minimize!",
+    Title = "Advanced Menu v2.0 Loaded",
+    Text = "All fixes applied! Horizontal layout.",
     Duration = 5
 })
